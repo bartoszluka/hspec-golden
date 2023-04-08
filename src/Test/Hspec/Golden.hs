@@ -21,6 +21,8 @@ type @String@. If your SUT has a different output, you can use 'Golden'.
 module Test.Hspec.Golden
   ( Golden(..)
   , defaultGolden
+  , runGolden
+  , mapGolden
   )
   where
 
@@ -69,6 +71,11 @@ instance Eq str => Example (Golden str) where
   type Arg (Golden str) = ()
   evaluateExample e = evaluateExample (\() -> e)
 
+instance Eq str => Example (IO (Golden str)) where
+  type Arg (IO (Golden str)) = ()
+  evaluateExample e = evaluateExample (\() -> e)
+
+
 instance Eq str => Example (arg -> Golden str) where
   type Arg (arg -> Golden str) = arg
   evaluateExample golden _ action _ = do
@@ -77,6 +84,17 @@ instance Eq str => Example (arg -> Golden str) where
       r <- runGolden (golden arg)
       writeIORef ref (fromGoldenResult r)
     readIORef ref
+
+instance Eq str => Example (arg -> IO (Golden str)) where
+  type Arg (arg -> IO (Golden str)) = arg
+  evaluateExample golden _ action _ = do
+    ref <- newIORef (Result "" Success)
+    action $ \arg -> do
+      g <- golden arg
+      r <- runGolden g
+      writeIORef ref (fromGoldenResult r)
+    readIORef ref
+
 
 -- | Transform a GoldenResult into a Result from Hspec
 
@@ -118,6 +136,12 @@ data GoldenResult =
    | SameOutput
    | FirstExecutionSucceed
    | FirstExecutionFail
+
+
+-- | map
+
+mapGolden :: Eq str => IO (Golden str) -> IO GoldenResult
+mapGolden = (>>= runGolden)
 
 -- | Runs a Golden test.
 
